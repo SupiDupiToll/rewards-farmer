@@ -1,6 +1,19 @@
-from typing import Generator
+import json
+import os
 import random
-import ollama
+import urllib.request
+import urllib.error
+from typing import Generator
+
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+# Your OpenRouter API key. Get one from https://openrouter.ai/settings/keys
+# Set it via the OPENROUTER_API_KEY environment variable.
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+# Any model identifier from https://openrouter.ai/models. The default
+# "openrouter/free" is OpenRouter's Free Models Router (https://openrouter.ai/openrouter/free),
+# which selects free models at random. Override with OPENROUTER_MODEL.
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openrouter/free")
 
 DEFAULT_SYSTEM_PROMPT_FOR_SEARCH_QUEST = (
 	"You are a helpful assistant tasked with creating a search query based on a directive. "
@@ -31,13 +44,42 @@ DEFAULT_USER_PROMPT_FOR_SEARCH_POINTS_WITHOUT_DESC = """Generate the first searc
 
 USER_PROMPT_FOR_SEARCH_QUERY_CONTINUATION = """Generate the next search query."""
 
-def get_ollama_response(messages: list[dict[str, str]], model: str="gemma4:cloud") -> str:
-	response = ollama.chat(
-		model=model,
-		messages=messages
+def get_llm_response(messages: list[dict[str, str]], model: str = OPENROUTER_MODEL) -> str:
+	"""Send a chat request to OpenRouter and return the assistant's reply."""
+	if not OPENROUTER_API_KEY:
+		raise RuntimeError(
+			"OPENROUTER_API_KEY is not set.\n\n"
+			"1. Create an account at https://openrouter.ai and get an API key at\n"
+			"   https://openrouter.ai/settings/keys (button 'Create Key', e.g. 'sk-or-...').\n"
+			"2. Make the key available as an environment variable, for example:\n\n"
+			"   Linux/macOS:  export OPENROUTER_API_KEY='sk-or-...'\n"
+			"   Windows CMD:   set OPENROUTER_API_KEY=sk-or-...\n"
+			"   PowerShell:    $env:OPENROUTER_API_KEY='sk-or-...'\n"
+			"   Or put it in a .env file and load it before running the script.\n"
+			"\nOptionally set OPENROUTER_MODEL to override the model (default openrouter/free)."
+		)
+
+	payload = json.dumps({
+		"model": model,
+		"messages": messages,
+	}).encode("utf-8")
+
+	request = urllib.request.Request(
+		OPENROUTER_URL,
+		data=payload,
+		headers={
+			"Authorization": f"Bearer {OPENROUTER_API_KEY}",
+			"Content-Type": "application/json",
+		},
 	)
 
-	return response.message.content
+	try:
+		with urllib.request.urlopen(request) as response:
+			data = json.loads(response.read().decode("utf-8"))
+	except urllib.error.HTTPError as e:
+		raise RuntimeError(f"OpenRouter request failed with HTTP {e.code}: {e.read().decode('utf-8')}") from e
+
+	return data["choices"][0]["message"]["content"]
 
 def get_search_query_from_task_description(task_description: str) -> str:
 	# compat
@@ -54,7 +96,7 @@ def get_search_query_from_task_description(task_description: str) -> str:
 		}
 	]
 
-	while not (response := get_ollama_response(messages)): pass # ensure non-empty response
+	while not (response := get_llm_response(messages)): pass # ensure non-empty response
 
 	return response.lower()
 
@@ -71,7 +113,7 @@ def get_related_search_queries(seed_word: str, num_queries: int=20) -> Generator
 	]
 
 	for _ in range(num_queries):
-		while not (response := get_ollama_response(messages)): pass # ensure non-empty response
+		while not (response := get_llm_response(messages)): pass # ensure non-empty response
 
 		yield response.lower()
 

@@ -19,7 +19,40 @@ cd rewards-farmer
 # Edit the included nouns.txt file to add or replace words as needed
 ```
 
-You should also have an Ollama account created (for the LLM), the `ollama` tool installed, and you should have signed in to the Ollama CLI via the command line using `ollama signin`. This project will use a minimal amount of Ollama cloud usage using `gemma4:cloud`. If you wish to use a different model, please change the `model` parameter in the `get_ollama_response` function in `src/llm_utils.py`.
+You also need an OpenRouter account and API key, since the script uses OpenRouter's free tier for the LLM.
+
+### 1. Get an API key
+
+1. Create a free account at [openrouter.ai](https://openrouter.ai).
+2. Go to [https://openrouter.ai/settings/keys](https://openrouter.ai/settings/keys) and click **Create Key**.
+3. Copy the generated key (starts with `sk-or-...`). Treat it like a password - do not commit it.
+
+### 2. Make the key available to the script
+
+**Linux / macOS (Bash or Zsh):**
+```sh
+export OPENROUTER_API_KEY='sk-or-...'
+```
+
+**Windows Command Prompt:**
+```bat
+set OPENROUTER_API_KEY=sk-or-...
+```
+
+**Windows PowerShell:**
+```powershell
+$env:OPENROUTER_API_KEY="sk-or-..."
+```
+
+> Tip: to avoid retyping it, add the `export` line to your shell profile (`~/.bashrc`, `~/.zshrc`, ...) or create a `.env` file in the project root containing `OPENROUTER_API_KEY=sk-or-...` and `set -a && source .env && set +a` before running.
+
+### 3. (Optional) Choose a different model
+
+By default the script uses the [Free Models Router](https://openrouter.ai/openrouter/free) (`openrouter/free`), which selects free models at random. Override it with any [available model](https://openrouter.ai/models):
+
+```sh
+export OPENROUTER_MODEL="anthropic/claude-3.5-sonnet"
+```
 
 You must also provide an image for the script to upload to complete the visual search task. Currently, this image is named `keypress_times.png` and is located in the root directory of the project (yes, I used a random image from my keyboard analysis to do this). You may provide an image of your own, just ensure that the absolute path of the image is placed in the `VISUAL_SEARCH_IMAGE_PATH` constant at the top of `rewards_tasks.py`.
 
